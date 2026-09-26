@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {Game} from './game.mjs';
+function setup(){let time=0;const game=new Game({now:()=>time,random:()=>0});for(let i=0;i<5;i++)game.add('p'+i);return {game,advance:ms=>{time+=ms;game.tick();}};}
+test('five players start automatically, early click resets',()=>{const {game}=setup();assert.equal(game.phase,'countdown');game.press('p0',1);assert.equal(game.phase,'failed');assert.equal(game.round,0);});
+test('six synchronized stages give three distinct private codes',()=>{const {game,advance}=setup();game.add('spectator');for(let r=1;r<=6;r++){advance(3500);game.press('spectator',r);assert.equal(game.hits.size,0);for(let i=0;i<5;i++)game.press('p'+i,r);}assert.equal(game.phase,'won');assert.equal(game.rewards.size,3);assert.deepEqual([...game.rewards.values()],['345231','820935','147983']);assert.equal(game.view('spectator').code,null);assert.equal(game.view('p4').code,null);advance(30000);assert.equal(game.phase,'countdown');assert.equal(game.round,1);assert.equal(game.rewards.size,0);});
+test('one second timeout fails and duplicate presses do not count',()=>{const {game,advance}=setup();advance(3500);game.press('p0',1);game.press('p0',1);assert.equal(game.hits.size,1);advance(1000);assert.equal(game.phase,'failed');});
+test('disconnect resets, late stale round cannot advance',()=>{const {game,advance}=setup();advance(3500);for(let i=0;i<5;i++)game.press('p'+i,1);game.press('p0',1);assert.equal(game.phase,'countdown');game.remove('p1');assert.equal(game.phase,'failed');advance(4000);assert.equal(game.phase,'waiting');});
